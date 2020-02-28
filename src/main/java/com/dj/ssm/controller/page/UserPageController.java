@@ -27,8 +27,13 @@ public class UserPageController {
     private UserService userService;
 
 
-    @RequestMapping("toShow")
+    @RequestMapping("toLogin")
     public String toLogin() {
+        return "user/login";
+    }
+
+    @RequestMapping("toShow")
+    public String toShow() {
         return "user/show";
     }
 

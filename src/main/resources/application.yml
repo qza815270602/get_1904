@@ -19,7 +19,7 @@ spring:
     view:
       prefix: /WEB-INF/page/ # 页面前缀
       suffix: .jsp # 页面后缀
-    # static-path-pattern: /static/**
+    static-path-pattern: /static/**
     #hiddenmethod 过滤器设置为启用
     hiddenmethod:
       filter:
