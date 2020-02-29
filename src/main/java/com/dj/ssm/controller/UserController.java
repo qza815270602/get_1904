@@ -1,104 +1,233 @@
 package com.dj.ssm.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+
+
 import com.dj.ssm.common.ResultModel;
+import com.dj.ssm.common.SystemConstant;
+import com.dj.ssm.pojo.Resource;
 import com.dj.ssm.pojo.User;
+import com.dj.ssm.pojo.UserRole;
+import com.dj.ssm.service.ResourceService;
+import com.dj.ssm.service.UserRoleService;
 import com.dj.ssm.service.UserService;
-import com.github.pagehelper.PageHelper;
-import com.github.pagehelper.PageInfo;
+import org.apache.shiro.SecurityUtils;
+import org.apache.shiro.authc.UsernamePasswordToken;
+import org.apache.shiro.subject.Subject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
+import javax.servlet.http.HttpSession;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/user/")
 public class UserController {
-
 
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private UserRoleService userRoleService;
 
+    @Autowired
+    private ResourceService resourceService;
 
-    @PutMapping
-    public ResultModel<Object> update(User user) {
-        userService.updateById(user);
-        return new ResultModel<>().success();
+    /**
+     * 登录
+     */
+    @RequestMapping("login")
+    public ResultModel<Object> login(String userName, String password, HttpSession session) {
+        try {
+            //判断不为空
+            if(StringUtils.isEmpty(userName) || StringUtils.isEmpty(password)){
+                return new ResultModel<>().error(SystemConstant.NOT_NULL);
+            }
+//            User user1 = userService.findNameAndPwd(userName, password);
+//            //用户是否存在
+//            if (user1 == null) {
+//                return new ResultModel<>().error(SystemConstant.INPUT_ERROR);
+//            }
+//            //用户是否激活
+//            if (!user1.getStatus().equals(SystemConstant.ONE)) {
+//                return new ResultModel<>().error(SystemConstant.ACTIVATE);
+//            }
+//            //用户是否删除
+//            if (user1.getIsDel().equals(SystemConstant.IS_DEL_ZERO)) {
+//                return new ResultModel<>().error(SystemConstant.DELETE);
+//            }
+//            // session存放用户信息
+//            session.setAttribute(SystemConstant.SESSION_USER, user1);
+//            //存放资源信息
+//            List<Resource> resourceList = resourceService.findResource(user1.getId());
+//            session.setAttribute(SystemConstant.SESSION_RESOURCE, resourceList);
+
+            // shiro登录方式
+            Subject subject = SecurityUtils.getSubject();//得到subject
+            UsernamePasswordToken token = new UsernamePasswordToken(userName, password);
+            subject.login(token);//访问shiro认证器
+            return new ResultModel<>().success(SystemConstant.SUCCESS);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResultModel<>().error(e.getMessage());
+        }
     }
 
-    @PostMapping
-    public ResultModel<Object> save(User user) {
-        userService.save(user);
-        return new ResultModel<>().success();
+    /**
+     * 查询盐
+     */
+    @RequestMapping("findSalt")
+    public ResultModel<Object> findSalt(String userName){
+        try {
+            User user = userService.findSalt(userName);
+            if (user == null) {
+                return new ResultModel<>().error(SystemConstant.INPUT_ERROR);
+            }
+            ResultModel resultModel = new ResultModel().success(true);
+            resultModel.setData(user.getSalt());
+            return resultModel;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResultModel<>().error(SystemConstant.ERROR);
+        }
     }
 
 
+    /**
+     * 展示
+     */
+    @RequestMapping("show")
+    public ResultModel<Object> show(User user) {
+        try {
+            List<User> userList = userService.findAllUser(user);
+            return new ResultModel<>().success(userList);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResultModel<>().error(SystemConstant.ERROR + e.getMessage());
+        }
+    }
+
+    /**
+     * 验证是否有用户
+     */
     @RequestMapping("findByName")
-    public boolean findByName(String userName) {
+    public boolean findByName(User user) {
         try {
-            QueryWrapper<User> wrapper = new QueryWrapper<User>();
-            wrapper.eq("user_name", userName);
-            User user = userService.getOne(wrapper);
-            return null == user ? true : false;
+            User user1 =userService.findByName(user);
+            return user1 == null ? true : false;
         } catch (Exception e) {
             e.printStackTrace();
-            return false;
-        }
-    }
-
-    @RequestMapping("findByPhone")
-    public boolean findByPhone(String phone) {
-        try {
-            QueryWrapper<User> wrapper = new QueryWrapper<User>();
-            wrapper.eq("phone", phone);
-            User user = userService.getOne(wrapper);
-            return null == user ? true : false;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
+            return true;
         }
     }
 
 
-    @DeleteMapping
-    public ResultModel<Object> del(User user){
-        userService.updateById(user);
-        return new ResultModel<>().success();
-    }
-
-    @PostMapping("/list")
-    public ResultModel<Object> show(User user, Integer age1, Integer pageNo) {
-        HashMap<String, Object> map = new HashMap<>();
+    /**
+     * 注册
+     */
+    @RequestMapping("add")
+    public ResultModel<Object> add(User user, UserRole userRole) {
         try {
-            PageHelper.startPage(pageNo, 2);
-            QueryWrapper<User> wrapper = new QueryWrapper<>();
-            if (!StringUtils.isEmpty(user.getUserName())) {
-                wrapper.like("user_name", user.getUserName());
-            }
-            if (null != user.getSex()) {
-                wrapper.eq("sex", user.getSex());
-            }
-            if (null != user.getAge() && null != age1) {
-                wrapper.between("age", user.getAge(), age1);
-            }
-            wrapper.eq("is_del", user.getIsDel());
-            List<User> userList = userService.list(wrapper);
-            PageInfo<User> pageInfo = new PageInfo<User>(userList);
-            map.put("totalNum", pageInfo.getPages());
-            map.put("userList", userList);
-            return new ResultModel<>().success(map);
+            userService.addUserAndUserRole(user, userRole);
+            return new ResultModel<>().success(SystemConstant.ADD_YES);
         } catch (Exception e) {
             e.printStackTrace();
-            return new ResultModel<>().error("服务器异常");
+            return new ResultModel<>().error(SystemConstant.ERROR + e.getMessage());
         }
-
     }
 
+    /**
+     * 修改
+     */
+    @RequestMapping("update")
+    public ResultModel<Object> update(User user) {
+        try {
+            userService.updateUser(user);
+            return new ResultModel<>().success(SystemConstant.SUCCESS);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResultModel<>().error(SystemConstant.ERROR + e.getMessage());
+        }
+    }
 
+    /**
+     * id删除
+     */
+    @RequestMapping("del")
+    public ResultModel<Object> del(User user) {
+        try {
+            userService.delUser(user);
+            return new ResultModel<>().success(SystemConstant.SUCCESS);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResultModel<>().error(SystemConstant.ERROR + e.getMessage());
+        }
+    }
 
+    /**
+     * 批量删除
+     */
+    @RequestMapping("delByIds")
+    public ResultModel<Object> delByIds(Integer[] ids) {
+        try {
+            userService.delUsers(ids);
+            return new ResultModel<>().success(SystemConstant.SUCCESS);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResultModel<>().error(SystemConstant.ERROR + e.getMessage());
+        }
+    }
+
+    /**
+     * 授权
+     */
+    @RequestMapping("updateUserRole")
+    public ResultModel<Object> updateUserRole(UserRole userRole) {
+        try {
+            userService.updateUserRole(userRole);
+            return new ResultModel<>().success(SystemConstant.SUCCESS);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResultModel<>().error(SystemConstant.ERROR + e.getMessage());
+        }
+    }
+
+    /**
+     * 手机验证码
+     */
+    @RequestMapping("sendMessage")
+    public ResultModel<Object> sendMessage(String phone) {
+        try {
+            Map<String, Object> resultMap = new HashMap<String, Object>();
+            User user = userService.sendMessage(phone);
+            if (user == null) {
+                return new ResultModel<>().error(SystemConstant.REGISTER);
+            }
+            resultMap.put("ver", String.valueOf(user.getVerify()));
+            resultMap.put("msg", SystemConstant.SUCCESS);
+            return new ResultModel<>().success(resultMap);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResultModel<>().error(SystemConstant.ERROR + e.getMessage());
+        }
+    }
+
+    /**
+     * 找回密码
+     */
+    @RequestMapping("find")
+    public ResultModel<Object> find(User user) {
+        try {
+            userService.findPhoneAndVerify(user);
+            return new ResultModel<>().success(SystemConstant.SUCCESS);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResultModel<>().error(SystemConstant.ERROR + e.getMessage());
+        }
+    }
 
 
 }
